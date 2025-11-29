@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test de Configuración</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-2xl w-full bg-gray-800 rounded-lg p-8">
+        <h1 class="text-3xl font-bold mb-6 text-center">🔧 Test de Configuración</h1>
+        
+        <div id="results" class="space-y-4">
+            <div class="bg-gray-700 p-4 rounded">
+                <p class="text-gray-400">Cargando configuración...</p>
+            </div>
+        </div>
+        
+        <div class="mt-6 space-y-3">
+            <button onclick="testJSONBin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold">
+                Probar Conexión JSONBin
+            </button>
+            <button onclick="testSendData()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold">
+                Enviar Datos de Prueba
+            </button>
+            <button onclick="testLoadData()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-bold">
+                Cargar Datos
+            </button>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const colors = {
+                success: 'bg-green-700',
+                error: 'bg-red-700',
+                warning: 'bg-yellow-700',
+                info: 'bg-blue-700'
+            };
+            
+            const div = document.createElement('div');
+            div.className = `${colors[type]} p-4 rounded`;
+            div.innerHTML = `<p>${message}</p>`;
+            results.appendChild(div);
+        }
+        
+        // Verificar configuración al cargar
+        window.addEventListener('load', () => {
+            results.innerHTML = '';
+            
+            addResult('📋 <strong>Configuración Actual:</strong>', 'info');
+            addResult(`Método: <strong>${CONFIG.STORAGE_METHOD}</strong>`, 'info');
+            
+            if (CONFIG.STORAGE_METHOD === 'jsonbin') {
+                const apiKeyConfigured = CONFIG.JSONBIN_API_KEY && CONFIG.JSONBIN_API_KEY !== '$2a$10$TU_API_KEY_AQUI';
+                const binIdConfigured = CONFIG.JSONBIN_BIN_ID && CONFIG.JSONBIN_BIN_ID !== 'TU_BIN_ID_AQUI';
+                
+                if (apiKeyConfigured) {
+                    addResult('✅ API Key configurada', 'success');
+                } else {
+                    addResult('❌ API Key NO configurada', 'error');
+                }
+                
+                if (binIdConfigured) {
+                    addResult('✅ Bin ID configurado', 'success');
+                } else {
+                    addResult('❌ Bin ID NO configurado', 'error');
+                }
+                
+                if (apiKeyConfigured && binIdConfigured) {
+                    addResult('🎉 Configuración completa! Haz clic en "Probar Conexión"', 'success');
+                } else {
+                    addResult('⚠️ Debes configurar config.js primero', 'warning');
+                }
+            } else if (CONFIG.STORAGE_METHOD === 'discord') {
+                if (CONFIG.DISCORD_WEBHOOK) {
+                    addResult('✅ Discord Webhook configurado', 'success');
+                } else {
+                    addResult('❌ Discord Webhook NO configurado', 'error');
+                }
+            } else if (CONFIG.STORAGE_METHOD === 'local') {
+                addResult('⚠️ Modo LOCAL - Los datos solo se guardan en este navegador', 'warning');
+            }
+        });
+        
+        async function testJSONBin() {
+            addResult('🔄 Probando conexión con JSONBin...', 'info');
+            
+            if (CONFIG.STORAGE_METHOD !== 'jsonbin') {
+                addResult('❌ El método de almacenamiento no es JSONBin', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.JSONBIN_BIN_ID}/latest`, {
+                    method: 'GET',
+                    headers: {
+                        'X-Master-Key': CONFIG.JSONBIN_API_KEY
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    addResult('✅ Conexión exitosa con JSONBin!', 'success');
+                    addResult(`📊 Visitantes almacenados: ${result.record.visitors ? result.record.visitors.length : 0}`, 'info');
+                } else {
+                    const errorText = await response.text();
+                    addResult(`❌ Error ${response.status}: ${errorText}`, 'error');
+                    
+                    if (response.status === 401) {
+                        addResult('💡 Verifica que tu API Key sea correcta', 'warning');
+                    } else if (response.status === 404) {
+                        addResult('💡 Verifica que tu Bin ID sea correcto', 'warning');
+                    }
+                }
+            } catch (error) {
+                addResult(`❌ Error de conexión: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testSendData() {
+            addResult('🔄 Enviando datos de prueba...', 'info');
+            
+            const testData = {
+                timestamp: new Date().toISOString(),
+                ip: {
+                    ip: '192.168.1.1',
+                    city: 'Test City',
+                    country: 'Test Country',
+                    latitude: 40.7128,
+                    longitude: -74.0060
+                },
+                browser: {
+                    platform: 'Test Platform'
+                }
+            };
+            
+            try {
+                // Obtener datos existentes
+                const getResponse = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.JSONBIN_BIN_ID}/latest`, {
+                    method: 'GET',
+                    headers: {
+                        'X-Master-Key': CONFIG.JSONBIN_API_KEY
+                    }
+                });
+                
+                let allData = [];
+                if (getResponse.ok) {
+                    const result = await getResponse.json();
+                    allData = result.record.visitors || result.record || [];
+                }
+                
+                // Agregar datos de prueba
+                allData.push(testData);
+                
+                // Actualizar bin
+                const updateResponse = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.JSONBIN_BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': CONFIG.JSONBIN_API_KEY
+                    },
+                    body: JSON.stringify({ visitors: allData })
+                });
+                
+                if (updateResponse.ok) {
+                    addResult('✅ Datos de prueba enviados exitosamente!', 'success');
+                    addResult(`📊 Total de visitantes: ${allData.length}`, 'info');
+                } else {
+                    const errorText = await updateResponse.text();
+                    addResult(`❌ Error al enviar: ${updateResponse.status} - ${errorText}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testLoadData() {
+            addResult('🔄 Cargando datos...', 'info');
+            
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.JSONBIN_BIN_ID}/latest`, {
+                    method: 'GET',
+                    headers: {
+                        'X-Master-Key': CONFIG.JSONBIN_API_KEY
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    const visitors = result.record.visitors || result.record || [];
+                    addResult(`✅ Datos cargados: ${visitors.length} visitantes`, 'success');
+                    
+                    if (visitors.length > 0) {
+                        const lastVisitor = visitors[visitors.length - 1];
+                        addResult(`📍 Último visitante: ${lastVisitor.ip?.city || 'N/A'}, ${lastVisitor.ip?.country || 'N/A'}`, 'info');
+                    }
+                } else {
+                    addResult(`❌ Error al cargar: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
