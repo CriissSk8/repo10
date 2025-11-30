@@ -17,7 +17,6 @@ const CONFIG = {
     DISCORD_WEBHOOK: '',
     
     // Para recibir por email (usando FormSubmit.co - gratis)
-    EMAIL_ENDPOINT: 'https://formsubmit.co/tu_email@ejemplo.com',
     
     // Método de almacenamiento: 'jsonbin', 'discord', 'email', 'local'
     STORAGE_METHOD: 'local' // Cambia a 'jsonbin', 'discord' o 'email' cuando configures
